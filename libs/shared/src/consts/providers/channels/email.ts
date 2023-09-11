@@ -12,6 +12,7 @@ import {
   outlook365Config,
   infobipEmailConfig,
   resendConfig,
+  plunkConfig,
   sparkpostConfig,
   emailWebhookConfig,
 } from '../credentials';
@@ -87,7 +88,7 @@ export const emailProviders: IProviderConfig[] = [
   },
   {
     id: EmailProviderIdEnum.NetCore,
-    displayName: 'NetCore',
+    displayName: 'Netcore',
     channel: ChannelTypeEnum.EMAIL,
     credentials: netCoreConfig,
     docReference: 'https://docs.novu.co/channels/email/netcore',
@@ -132,6 +133,14 @@ export const emailProviders: IProviderConfig[] = [
     credentials: resendConfig,
     docReference: 'https://docs.novu.co/channels/email/resend',
     logoFileName: { light: 'resend.svg', dark: 'resend.svg' },
+  },
+  {
+    id: EmailProviderIdEnum.Plunk,
+    displayName: 'Plunk',
+    channel: ChannelTypeEnum.EMAIL,
+    credentials: plunkConfig,
+    docReference: 'https://docs.novu.co/channels/email/plunk',
+    logoFileName: { light: 'plunk.png', dark: 'plunk.png' },
   },
   {
     id: EmailProviderIdEnum.SparkPost,

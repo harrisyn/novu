@@ -1,28 +1,28 @@
 import { Queue } from 'bullmq';
 import { JobRepository, JobStatusEnum } from '@novu/dal';
-import { StepTypeEnum } from '@novu/shared';
+import { JobTopicNameEnum, StepTypeEnum } from '@novu/shared';
 
-import { QueueService } from './queue.service';
+import { TestingQueueService } from './testing-queue.service';
+
+const LOG_CONTEXT = 'TestingJobsService';
 
 export class JobsService {
   private jobRepository = new JobRepository();
-  public queueService: QueueService;
-  public queue: Queue;
-  public jobQueue: QueueService;
 
-  constructor() {
-    this.queueService = new QueueService('trigger-handler');
-    this.queue = this.queueService.queue;
+  public standardQueue: Queue;
+  public workflowQueue: Queue;
 
-    this.jobQueue = new QueueService('standard');
+  constructor(private isClusterMode?: boolean) {
+    this.workflowQueue = new TestingQueueService(JobTopicNameEnum.WORKFLOW).queue;
+    this.standardQueue = new TestingQueueService(JobTopicNameEnum.STANDARD).queue;
   }
 
   public async awaitParsingEvents() {
     let waitingCount = 0;
     let parsedEvents = 0;
     do {
-      waitingCount = await this.queue.getWaitingCount();
-      parsedEvents = await this.queue.getActiveCount();
+      waitingCount = await this.workflowQueue.getWaitingCount();
+      parsedEvents = await this.workflowQueue.getActiveCount();
     } while (parsedEvents > 0 || waitingCount > 0);
   }
 
@@ -45,11 +45,11 @@ export class JobsService {
     let activeCountJobs = 0;
 
     do {
-      waitingCount = await this.queue.getWaitingCount();
-      parsedEvents = await this.queue.getActiveCount();
+      waitingCount = await this.workflowQueue.getWaitingCount();
+      parsedEvents = await this.workflowQueue.getActiveCount();
 
-      waitingCountJobs = await this.jobQueue.queue.getWaitingCount();
-      activeCountJobs = await this.jobQueue.queue.getActiveCount();
+      waitingCountJobs = await this.standardQueue.getWaitingCount();
+      activeCountJobs = await this.standardQueue.getActiveCount();
 
       runningJobs = await this.jobRepository.count({
         _organizationId: organizationId,

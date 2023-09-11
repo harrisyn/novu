@@ -1,5 +1,12 @@
-import { Queue, Worker, WorkerOptions } from 'bullmq';
-import { BullMqService } from '@novu/application-generic';
+import {
+  InboundParseQueue,
+  InboundParseWorker,
+  Queue,
+  QueueOptions,
+  Worker,
+  WorkerOptions,
+} from '@novu/application-generic';
+import { JobTopicNameEnum } from '@novu/shared';
 import { Injectable } from '@nestjs/common';
 
 import { InboundEmailParse } from '../usecases/inbound-email-parse/inbound-email-parse.usecase';
@@ -7,24 +14,19 @@ import { InboundEmailParseCommand } from '../usecases/inbound-email-parse/inboun
 
 @Injectable()
 export class InboundParseQueueService {
-  readonly QUEUE_NAME = 'inbound-parse-mail';
-
   public readonly queue: Queue;
   public readonly worker: Worker;
-  private readonly bullMqService: BullMqService;
 
-  constructor(private emailParseUsecase: InboundEmailParse) {
-    this.bullMqService = new BullMqService();
-    this.queue = this.bullMqService.createQueue(this.QUEUE_NAME, {
-      defaultJobOptions: {
-        removeOnComplete: true,
-      },
-    });
-
-    this.worker = this.bullMqService.createWorker(this.QUEUE_NAME, this.getWorkerProcessor(), this.getWorkerOpts());
+  constructor(
+    private emailParseUsecase: InboundEmailParse,
+    public readonly inboundParseQueue: InboundParseQueue,
+    public readonly inboundParseWorker: InboundParseWorker
+  ) {
+    this.inboundParseQueue.createQueue();
+    this.inboundParseWorker.createWorker(this.getWorkerProcessor(), this.getWorkerOptions());
   }
 
-  private getWorkerOpts(): WorkerOptions {
+  private getWorkerOptions(): WorkerOptions {
     return {
       lockDuration: 90000,
       concurrency: 200,

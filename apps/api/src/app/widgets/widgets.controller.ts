@@ -17,7 +17,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { ApiExcludeController, ApiNoContentResponse, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { AnalyticsService, GetSubscriberPreference, GetSubscriberPreferenceCommand } from '@novu/application-generic';
 import { MessageEntity, SubscriberEntity } from '@novu/dal';
-import { ButtonTypeEnum, MessageActionStatusEnum } from '@novu/shared';
+import { MarkMessagesAsEnum, ButtonTypeEnum, MessageActionStatusEnum } from '@novu/shared';
 
 import { SubscriberSession } from '../shared/framework/user.decorator';
 import {
@@ -112,6 +112,7 @@ export class WidgetsController {
       feedId: feedsQuery,
       query: { seen: query.seen, read: query.read },
       limit: query.limit != null ? parseInt(query.limit) : 10,
+      payload: query.payload,
     });
 
     return await this.getNotificationsFeedUsecase.execute(command);
@@ -126,6 +127,10 @@ export class WidgetsController {
     @Query('limit', new DefaultValuePipe(100), new LimitPipe(1, 100, true)) limit: number
   ): Promise<UnseenCountResponse> {
     const feedsQuery = this.toArray(feedId);
+
+    if (seen === undefined) {
+      seen = false;
+    }
 
     const command = GetFeedCountCommand.create({
       organizationId: subscriberSession._organizationId,
@@ -148,6 +153,10 @@ export class WidgetsController {
     @Query('limit', new DefaultValuePipe(100), new LimitPipe(1, 100, true)) limit: number
   ): Promise<UnseenCountResponse> {
     const feedsQuery = this.toArray(feedId);
+
+    if (read === undefined) {
+      read = false;
+    }
 
     const command = GetFeedCountCommand.create({
       organizationId: subscriberSession._organizationId,
@@ -266,8 +275,8 @@ export class WidgetsController {
       organizationId: subscriberSession._organizationId,
       subscriberId: subscriberSession.subscriberId,
       environmentId: subscriberSession._environmentId,
-      markAs: 'read',
-      feedIds,
+      markAs: MarkMessagesAsEnum.READ,
+      feedIdentifiers: feedIds,
     });
 
     return await this.markAllMessagesAsUsecase.execute(command);
@@ -287,8 +296,8 @@ export class WidgetsController {
       organizationId: subscriberSession._organizationId,
       subscriberId: subscriberSession.subscriberId,
       environmentId: subscriberSession._environmentId,
-      markAs: 'seen',
-      feedIds,
+      markAs: MarkMessagesAsEnum.SEEN,
+      feedIdentifiers: feedIds,
     });
 
     return await this.markAllMessagesAsUsecase.execute(command);

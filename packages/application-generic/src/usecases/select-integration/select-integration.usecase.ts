@@ -1,25 +1,25 @@
 import { Injectable } from '@nestjs/common';
 import { IntegrationEntity, IntegrationRepository } from '@novu/dal';
+import { CHANNELS_WITH_PRIMARY } from '@novu/shared';
 
-import {
-  GetNovuIntegration,
-  GetNovuIntegrationCommand,
-} from '../get-novu-integration';
 import { SelectIntegrationCommand } from './select-integration.command';
-import { decryptCredentials } from '../../encryption';
-import { buildIntegrationKey, CachedQuery } from '../../services';
-import { FeatureFlagCommand, GetFeatureFlag } from '../get-feature-flag';
+import { buildIntegrationKey, CachedQuery } from '../../services/cache';
+import {
+  FeatureFlagCommand,
+  GetIsMultiProviderConfigurationEnabled,
+} from '../get-feature-flag';
 import {
   GetDecryptedIntegrations,
   GetDecryptedIntegrationsCommand,
 } from '../get-decrypted-integrations';
 
+const LOG_CONTEXT = 'SelectIntegration';
+
 @Injectable()
 export class SelectIntegration {
   constructor(
     private integrationRepository: IntegrationRepository,
-    private getNovuIntegration: GetNovuIntegration,
-    protected getFeatureFlag: GetFeatureFlag,
+    protected getIsMultiProviderConfigurationEnabled: GetIsMultiProviderConfigurationEnabled,
     protected getDecryptedIntegrationsUsecase: GetDecryptedIntegrations
   ) {}
 
@@ -34,7 +34,7 @@ export class SelectIntegration {
     command: SelectIntegrationCommand
   ): Promise<IntegrationEntity | undefined> {
     const isMultiProviderConfigurationEnabled =
-      await this.getFeatureFlag.isMultiProviderConfigurationEnabled(
+      await this.getIsMultiProviderConfigurationEnabled.execute(
         FeatureFlagCommand.create({
           userId: command.userId,
           organizationId: command.organizationId,
@@ -57,14 +57,30 @@ export class SelectIntegration {
       return integrations[0];
     }
 
-    const query: Partial<IntegrationEntity> & { _organizationId: string } = {
+    const isChannelSupportsPrimary = CHANNELS_WITH_PRIMARY.includes(
+      command.channelType
+    );
+
+    let query: Partial<IntegrationEntity> & { _organizationId: string } = {
       ...(command.id ? { id: command.id } : {}),
       _organizationId: command.organizationId,
       _environmentId: command.environmentId,
       channel: command.channelType,
       ...(command.providerId ? { providerId: command.providerId } : {}),
       active: true,
+      ...(isChannelSupportsPrimary && {
+        primary: true,
+      }),
     };
+
+    if (command.identifier) {
+      query = {
+        _organizationId: command.organizationId,
+        channel: command.channelType,
+        identifier: command.identifier,
+        active: true,
+      };
+    }
 
     const integration = await this.integrationRepository.findOne(
       query,
@@ -72,21 +88,10 @@ export class SelectIntegration {
       { query: { sort: { createdAt: -1 } } }
     );
 
-    if (integration) {
-      integration.credentials = decryptCredentials(integration.credentials);
-
-      return integration;
+    if (!integration) {
+      return;
     }
 
-    const novuIntegration = await this.getNovuIntegration.execute(
-      GetNovuIntegrationCommand.create({
-        channelType: command.channelType,
-        organizationId: command.organizationId,
-        environmentId: command.environmentId,
-        userId: command.userId,
-      })
-    );
-
-    return novuIntegration;
+    return GetDecryptedIntegrations.getDecryptedCredentials(integration);
   }
 }
